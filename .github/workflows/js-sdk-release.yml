@@ -70,7 +70,7 @@ jobs:
         with:
           # Trusted publishing needs Node >= 22.14.0; '22' resolves to the latest 22.x, which is well
           # past that. No registry-url/NODE_AUTH_TOKEN: OIDC replaces the .npmrc token entirely.
-          node-version: '22'
+          node-version: '24'
           cache: 'npm'
           cache-dependency-path: sdk/javascript/package-lock.json
 

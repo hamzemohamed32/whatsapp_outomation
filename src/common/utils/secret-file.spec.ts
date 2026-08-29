@@ -39,15 +39,15 @@ describe('writeSecretFile', () => {
     expect(readFileSync(p, 'utf8')).toBe('new');
   });
 
-  it('warns to the console when a chmod fails (does not stay silently world-readable)', () => {
+  it('does not warn when the pre-write chmod finds no file on a clean installation', () => {
     const p = join(dir, 'ghost');
     const warnSpy = jest.spyOn(console, 'warn').mockImplementation(() => undefined);
 
-    // chmod a path that does not exist → ENOENT on the pre-write call. The write still succeeds
-    // (create-mode), and the failure is surfaced via console.warn instead of being swallowed.
+    // chmod on a path that does not exist is the normal first-write path. Create-mode still
+    // protects the new file, so this expected ENOENT must not look like an installation error.
     writeSecretFile(p, 'secret');
 
-    expect(warnSpy).toHaveBeenCalledWith(expect.stringContaining('pre-write chmod 0o600 failed'));
+    expect(warnSpy).not.toHaveBeenCalled();
     expect(readFileSync(p, 'utf8')).toBe('secret');
 
     warnSpy.mockRestore();

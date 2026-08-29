@@ -13,6 +13,7 @@ import { ConfigService } from '@nestjs/config';
 import { SqlitePermissionsBoot, tightenSqliteFilePermissions } from './sqlite-file-permissions';
 
 const modeOf = (path: string): number => statSync(path).mode & 0o777;
+const itPosix = process.platform === 'win32' ? it.skip : it;
 
 describe('tightenSqliteFilePermissions', () => {
   let dir: string;
@@ -24,7 +25,7 @@ describe('tightenSqliteFilePermissions', () => {
     rmSync(dir, { recursive: true, force: true });
   });
 
-  it('tightens an existing database file and its WAL/journal sidecars to owner-only', () => {
+  itPosix('tightens an existing database file and its WAL/journal sidecars to owner-only', () => {
     const db = join(dir, 'openwa.sqlite');
     writeFileSync(db, '', { mode: 0o644 });
     writeFileSync(`${db}-wal`, '', { mode: 0o644 });
@@ -70,7 +71,7 @@ describe('SqlitePermissionsBoot', () => {
   const configReturning = (values: Record<string, string>): ConfigService =>
     ({ get: (key: string, defaultValue?: string) => values[key] ?? defaultValue }) as unknown as ConfigService;
 
-  it('tightens both bundled files when the data connection is SQLite', () => {
+  itPosix('tightens both bundled files when the data connection is SQLite', () => {
     const main = join(dir, 'main.sqlite');
     const data = join(dir, 'openwa.sqlite');
     writeFileSync(main, '', { mode: 0o644 });
@@ -85,7 +86,7 @@ describe('SqlitePermissionsBoot', () => {
     expect(modeOf(data)).toBe(0o600);
   });
 
-  it('skips the data file when the data connection is Postgres (no local file to tighten)', () => {
+  itPosix('skips the data file when the data connection is Postgres (no local file to tighten)', () => {
     const main = join(dir, 'main.sqlite');
     const data = join(dir, 'should-not-be-touched.sqlite');
     writeFileSync(main, '', { mode: 0o644 });

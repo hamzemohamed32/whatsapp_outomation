@@ -7,6 +7,11 @@ const DEFAULT_LIST_MAX_FILES = 100_000;
 /** Max directory depth a local traversal descends. Prevents a pathological tree from running unbounded. */
 const LOCAL_TRAVERSAL_MAX_DEPTH = 20;
 
+/** Storage keys are backend-independent and always use POSIX separators, including on Windows. */
+function toStorageKey(relativePath: string): string {
+  return relativePath.split(path.sep).join('/');
+}
+
 function positiveIntFromEnv(name: string, fallback: number): number {
   const parsed = Number.parseInt(process.env[name] ?? '', 10);
   return Number.isInteger(parsed) && parsed > 0 ? parsed : fallback;
@@ -56,7 +61,7 @@ export async function* iterateLocalFiles(localPath: string, prefix = ''): AsyncG
       if (entry.isDirectory()) {
         queue.push({ dir: relativePath, depth: depth + 1 });
       } else if (entry.isFile()) {
-        yield relativePath;
+        yield toStorageKey(relativePath);
       }
     }
   }

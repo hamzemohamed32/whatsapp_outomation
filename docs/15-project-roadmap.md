@@ -103,7 +103,7 @@ Each phase includes a 2–3 week buffer for:
 | Requirement        | Details                                                   |
 | ------------------ | --------------------------------------------------------- |
 | **Development**    | 1-2 full-time developers (or equivalent part-time)        |
-| **Environment**    | Node.js 22 LTS, Docker, Git                               |
+| **Environment**    | Node.js 24 LTS, Docker, Git                               |
 | **Testing**        | WhatsApp test accounts (2-3 numbers)                      |
 | **Infrastructure** | VPS for staging (2GB RAM minimum)                         |
 | **Accounts**       | GitHub organization, npm registry access, Docker Hub/GHCR |

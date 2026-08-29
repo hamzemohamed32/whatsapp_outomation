@@ -29,6 +29,8 @@ import { BadRequestException } from '@nestjs/common';
 import { InfraStorageController } from './infra-storage.controller';
 import { AuditAction } from '../audit/entities/audit-log.entity';
 
+const TEST_CWD = path.join(path.parse(process.cwd()).root, 'srv', 'openwa');
+
 describe('InfraStorageController.importStorage filePath validation', () => {
   function buildController(storage: Partial<{ importFromStream: jest.Mock; getCurrentStorageType: jest.Mock }>) {
     return new InfraStorageController(storage as never);
@@ -45,8 +47,9 @@ describe('InfraStorageController.importStorage filePath validation', () => {
   });
 
   it('guards and opens the same cwd-resolved path returned by storage export', async () => {
-    const cwdSpy = jest.spyOn(process, 'cwd').mockReturnValue('/srv/openwa');
-    (fs.existsSync as jest.Mock).mockImplementation((p: string) => p === '/srv/openwa/data/exports/export.tar.gz');
+    const cwdSpy = jest.spyOn(process, 'cwd').mockReturnValue(TEST_CWD);
+    const archive = path.join(TEST_CWD, 'data', 'exports', 'export.tar.gz');
+    (fs.existsSync as jest.Mock).mockImplementation((p: string) => p === archive);
     (fs.createReadStream as jest.Mock).mockClear();
     const storage = {
       importFromStream: jest.fn().mockResolvedValue(3),
@@ -54,7 +57,7 @@ describe('InfraStorageController.importStorage filePath validation', () => {
     };
     try {
       const result = await buildController(storage).importStorage({ filePath: 'data/exports/export.tar.gz' });
-      expect(fs.createReadStream).toHaveBeenCalledWith('/srv/openwa/data/exports/export.tar.gz');
+      expect(fs.createReadStream).toHaveBeenCalledWith(archive);
       expect(storage.importFromStream).toHaveBeenCalledTimes(1);
       expect(result).toEqual({ imported: true, count: 3, storageType: 'local' });
     } finally {
@@ -208,8 +211,9 @@ describe('InfraStorageController.sweepStaleExportArchives (boot orphan sweep)', 
 
 describe('InfraStorageController storage stream failures surface as request errors, not process crashes', () => {
   it('importStorage maps an archive/stream failure to a 400 with the real reason', async () => {
-    const cwdSpy = jest.spyOn(process, 'cwd').mockReturnValue('/srv/openwa');
-    (fs.existsSync as jest.Mock).mockImplementation((p: string) => p === '/srv/openwa/data/exports/bad.tar.gz');
+    const cwdSpy = jest.spyOn(process, 'cwd').mockReturnValue(TEST_CWD);
+    const archive = path.join(TEST_CWD, 'data', 'exports', 'bad.tar.gz');
+    (fs.existsSync as jest.Mock).mockImplementation((p: string) => p === archive);
     try {
       const storage = {
         importFromStream: jest.fn().mockRejectedValue(new Error('incorrect header check')),
@@ -261,8 +265,9 @@ describe('InfraStorageController audit trail (light-dependency handlers)', () =>
 
   it('importStorage emits INFRA_STORAGE_IMPORTED with the imported file count', async () => {
     const audit = makeAudit();
-    const cwdSpy = jest.spyOn(process, 'cwd').mockReturnValue('/srv/openwa');
-    (fs.existsSync as jest.Mock).mockImplementation((p: string) => p === '/srv/openwa/data/exports/x.tar.gz');
+    const cwdSpy = jest.spyOn(process, 'cwd').mockReturnValue(TEST_CWD);
+    const archive = path.join(TEST_CWD, 'data', 'exports', 'x.tar.gz');
+    (fs.existsSync as jest.Mock).mockImplementation((p: string) => p === archive);
     try {
       const storageService = { importFromStream: jest.fn().mockResolvedValue(5), getCurrentStorageType: () => 'local' };
       await build(audit, { storageService }).importStorage({ filePath: 'data/exports/x.tar.gz' });

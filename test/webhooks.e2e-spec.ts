@@ -107,10 +107,12 @@ describe('Webhooks (e2e)', () => {
     });
     await new Promise<void>(resolve => receiver.listen(0, '127.0.0.1', resolve));
     receiverUrl = `http://127.0.0.1:${(receiver.address() as AddressInfo).port}/hook`;
-  });
+  }, 120_000);
 
   afterAll(async () => {
-    await new Promise<void>(resolve => receiver.close(() => resolve()));
+    if (receiver?.listening) {
+      await new Promise<void>(resolve => receiver.close(() => resolve()));
+    }
     if (prevSsrf === undefined) delete process.env.WEBHOOK_SSRF_PROTECT;
     else process.env.WEBHOOK_SSRF_PROTECT = prevSsrf;
     if (prevMaxPerSession === undefined) delete process.env.WEBHOOK_MAX_PER_SESSION;

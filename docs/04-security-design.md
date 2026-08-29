@@ -672,7 +672,7 @@ updates:
       - dependency-name: 'typescript'
         versions: ['>=7.0.0']
       # better-sqlite3 v13: every released TypeORM caps its peer at ^12, and the linux-arm64
-      # prebuild needs glibc 2.38 (the node:22-slim base has 2.36).
+      # prebuild needs glibc 2.38 (the node:24-slim base has 2.36).
       - dependency-name: 'better-sqlite3'
         versions: ['>=13.0.0']
 ```
@@ -704,7 +704,7 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: '22'
+          node-version: '24'
 
       - name: Install dependencies
         run: npm ci

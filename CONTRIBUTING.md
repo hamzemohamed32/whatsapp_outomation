@@ -18,7 +18,7 @@ See `docs/03-system-architecture.md` for the bigger picture.
 
 ## Getting started
 
-OpenWA targets **Node.js 22+**.
+OpenWA targets **Node.js 24 LTS+**.
 
 ```bash
 # backend

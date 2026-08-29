@@ -82,3 +82,7 @@ _docs/
 .superpowers/
 # TypeScript incremental build cache (tsc writes this at repo root under the TS6 build config)
 *.tsbuildinfo
+
+# Generated handbook render/work intermediates (keep the finished artifact in artifacts/)
+artifacts/.handbook_render/
+artifacts/.handbook_work/

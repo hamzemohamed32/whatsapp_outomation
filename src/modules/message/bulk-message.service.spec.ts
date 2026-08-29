@@ -311,6 +311,23 @@ describe('BulkMessageService.processBatch', () => {
   const inFlightMarkers = (): Map<string, boolean> =>
     (service as unknown as { processingBatches: Map<string, boolean> }).processingBatches;
 
+  it('calculates the configured inter-message delay and optional 0–2 second jitter', () => {
+    const calculateDelay = (
+      service as unknown as {
+        calculateDelay: (options: { delayBetweenMessages: number; randomizeDelay: boolean }) => number;
+      }
+    ).calculateDelay.bind(service);
+
+    expect(calculateDelay({ delayBetweenMessages: 3000, randomizeDelay: false })).toBe(3000);
+
+    const random = jest.spyOn(Math, 'random').mockReturnValue(0.5);
+    try {
+      expect(calculateDelay({ delayBetweenMessages: 3000, randomizeDelay: true })).toBe(4000);
+    } finally {
+      random.mockRestore();
+    }
+  });
+
   it('rejects a new batch (before persisting) when the concurrent in-flight cap is reached', async () => {
     const prev = process.env.BULK_MAX_CONCURRENT_BATCHES;
     process.env.BULK_MAX_CONCURRENT_BATCHES = '2';

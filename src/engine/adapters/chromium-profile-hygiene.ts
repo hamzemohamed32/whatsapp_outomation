@@ -19,6 +19,52 @@ import type { LoggerService } from '../../common/services/logger.service';
 /** Just enough of the logger to report; the adapter passes its own so spies keep observing it. */
 type HygieneLogger = Pick<LoggerService, 'debug' | 'log'>;
 
+interface ProcessEntry {
+  pid: number;
+  args: string;
+}
+
+function execFileOutput(file: string, args: string[]): Promise<string> {
+  return new Promise<string>((resolve, reject) => {
+    execFile(file, args, { maxBuffer: 8 * 1024 * 1024 }, (error, stdout) => {
+      if (error) reject(error instanceof Error ? error : new Error(error.message));
+      else resolve(stdout);
+    });
+  });
+}
+
+async function enumerateProcesses(): Promise<ProcessEntry[] | null> {
+  if (process.platform === 'darwin' || process.platform === 'linux') {
+    const output = await execFileOutput('ps', ['-eo', 'pid=,args=']);
+    const entries: ProcessEntry[] = [];
+    for (const line of output.split('\n')) {
+      const match = /^\s*(\d+)\s+(.*)$/.exec(line);
+      if (match) entries.push({ pid: Number(match[1]), args: match[2] });
+    }
+    return entries;
+  }
+
+  if (process.platform === 'win32') {
+    // Static PowerShell program, passed as one argv value (no shell and no session input in it).
+    // Win32_Process exposes the full Chromium command line, including our marker argument.
+    const output = await execFileOutput('powershell.exe', [
+      '-NoLogo',
+      '-NoProfile',
+      '-NonInteractive',
+      '-Command',
+      'Get-CimInstance Win32_Process | Select-Object ProcessId,CommandLine | ConvertTo-Json -Compress',
+    ]);
+    if (!output.trim()) return [];
+    const parsed = JSON.parse(output) as
+      { ProcessId?: number; CommandLine?: string | null } | Array<{ ProcessId?: number; CommandLine?: string | null }>;
+    return (Array.isArray(parsed) ? parsed : [parsed])
+      .filter(row => Number.isInteger(row.ProcessId) && typeof row.CommandLine === 'string')
+      .map(row => ({ pid: row.ProcessId!, args: row.CommandLine! }));
+  }
+
+  return null;
+}
+
 /**
  * SIGKILL any Chromium orphaned by a previous lifetime of this process. When OpenWA dies hard
  * (kill -9, crash, host reboot) Puppeteer's exit hook never runs, so the browser survives as an
@@ -28,33 +74,25 @@ type HygieneLogger = Pick<LoggerService, 'debug' | 'log'>;
  * logs at debug, so the sweep can never block an engine start.
  */
 export async function killOrphanedChromiumProcesses(sessionId: string, logger: HygieneLogger): Promise<void> {
-  if (process.platform !== 'darwin' && process.platform !== 'linux') {
-    logger.debug(`Skipping orphaned Chromium sweep: unsupported platform ${process.platform}`);
+  // Diagnostic/test escape hatch. The normal runtime default is enabled; disabling it can isolate
+  // a host process-enumeration problem without preventing the session from starting.
+  if (process.env.OPENWA_DISABLE_ORPHAN_SWEEP === 'true') {
+    logger.debug('Skipping orphaned Chromium sweep: disabled by OPENWA_DISABLE_ORPHAN_SWEEP');
     return;
   }
   try {
-    // No shell: the args array is handed to ps verbatim, so nothing here is injectable.
-    // maxBuffer is raised because `ps -eo args` prints full command lines, which on a busy host
-    // (many Chromium renderers carrying dozens of flags each) can exceed the 1MB default.
-    const psOutput = await new Promise<string>((resolve, reject) => {
-      execFile('ps', ['-eo', 'pid=,args='], { maxBuffer: 8 * 1024 * 1024 }, (error, stdout) => {
-        // The @types/node ExecFileException is an Omit<> of ErrnoException, which the type
-        // checker no longer recognises as an Error — narrow it explicitly for the reject.
-        if (error) reject(error instanceof Error ? error : new Error(error.message));
-        else resolve(stdout);
-      });
-    });
+    const processes = await enumerateProcesses();
+    if (processes === null) {
+      logger.debug(`Skipping orphaned Chromium sweep: unsupported platform ${process.platform}`);
+      return;
+    }
     // Token-exact marker match: the marker is a single argv token, so it must appear delimited by
     // whitespace or string boundaries. A plain substring test would let restarting session
     // `sales` SIGKILL the LIVE browser of sibling `sales2` (their markers share a prefix).
     const marker = `--openwa-session=${sessionId}`;
     const markerRe = new RegExp('(?:^|\\s)' + marker.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '(?=\\s|$)');
     const killedPids: number[] = [];
-    for (const line of psOutput.split('\n')) {
-      const match = /^\s*(\d+)\s+(.*)$/.exec(line);
-      if (!match) continue;
-      const pid = Number(match[1]);
-      const args = match[2];
+    for (const { pid, args } of processes) {
       if (pid === process.pid || !markerRe.test(args)) continue;
       // Never kill a non-browser process that happens to carry the marker string
       // (e.g. a `grep --openwa-session=…` probing the process table).

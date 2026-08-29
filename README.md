@@ -19,7 +19,7 @@
   <a href="https://github.com/rmyndharis/OpenWA/actions/workflows/ci.yml"><img src="https://github.com/rmyndharis/OpenWA/actions/workflows/ci.yml/badge.svg?branch=main" alt="CI"/></a>
   <img src="https://img.shields.io/github/package-json/v/rmyndharis/OpenWA?label=version&color=blue" alt="Version"/>
   <img src="https://img.shields.io/badge/license-MIT-green.svg" alt="License"/>
-  <img src="https://img.shields.io/badge/node-22_LTS-brightgreen.svg" alt="Node"/>
+  <img src="https://img.shields.io/badge/node-24_LTS-brightgreen.svg" alt="Node"/>
   <img src="https://img.shields.io/github/package-json/dependency-version/rmyndharis/OpenWA/@nestjs/core?label=NestJS&color=red" alt="NestJS"/>
   <img src="https://img.shields.io/badge/docker-ready-blue.svg" alt="Docker"/>
   <img src="https://img.shields.io/github/package-json/dependency-version/rmyndharis/OpenWA/dev/typescript?label=TypeScript&color=3178C6" alt="TypeScript"/>
@@ -364,7 +364,7 @@ The key can be passed as `Authorization: Bearer …` or `X-API-Key: …`. Every 
 
 | Layer         | Technology                                              |
 | ------------- | ------------------------------------------------------- |
-| **Runtime**   | Node.js 22 LTS                                          |
+| **Runtime**   | Node.js 24 LTS                                          |
 | **Framework** | NestJS 11.x                                             |
 | **Language**  | TypeScript 6.x                                          |
 | **WA Engine** | whatsapp-web.js (default) / baileys — set `ENGINE_TYPE` |
@@ -423,6 +423,7 @@ Comprehensive documentation is available in the `docs/` folder:
 | [API Spec](./docs/06-api-specification.md)              | Complete API reference       |
 | [Development](./docs/08-development-guidelines.md)      | Coding standards             |
 | [Migration Guide](./docs/14-migration-guide.md)         | Database & storage migration |
+| [Local Customization](./docs/31-local-customization.md) | Safe local upgrade workflow  |
 
 ---
 

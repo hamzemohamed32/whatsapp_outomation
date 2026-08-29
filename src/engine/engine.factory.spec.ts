@@ -171,8 +171,12 @@ describe('EngineFactory', () => {
 
       factory.create({ sessionId: 'alice', dbSessionId: 'db-1' });
 
-      expect(fs.statSync(wwjsDir).mode & 0o777).toBe(0o700);
-      expect(fs.statSync(baileysDir).mode & 0o777).toBe(0o700);
+      // NTFS does not expose POSIX owner/group/world mode semantics through stat(). The creation
+      // path is still covered on Windows; exact 0700 hardening is asserted where chmod is real.
+      if (process.platform !== 'win32') {
+        expect(fs.statSync(wwjsDir).mode & 0o777).toBe(0o700);
+        expect(fs.statSync(baileysDir).mode & 0o777).toBe(0o700);
+      }
     });
   });
 

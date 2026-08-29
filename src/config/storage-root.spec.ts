@@ -76,6 +76,9 @@ describe('isStorageRootWritable', () => {
   it('reports an EXISTING but unwritable root as not writable (the #1065 case existsSync misses)', () => {
     // Running as root bypasses permission bits entirely, so the negative case is unprovable there.
     if (typeof process.getuid === 'function' && process.getuid() === 0) return;
+    // Node's chmod does not remove write access from the current user on NTFS; use POSIX CI to pin
+    // this chmod-specific behaviour.
+    if (process.platform === 'win32') return;
 
     const root = path.join(tmp, 'locked');
     fs.mkdirSync(root);

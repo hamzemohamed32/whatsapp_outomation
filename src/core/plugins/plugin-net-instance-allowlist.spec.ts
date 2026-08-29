@@ -68,7 +68,9 @@ describe('the net allowlist admits every provisioned instance host', () => {
   /** The allowlist refusal is thrown before any socket work, so it is distinguishable by message. */
   const refusalFor = async (net: ReturnType<typeof netCapability>, url: string): Promise<string> => {
     try {
-      await net.fetch(url);
+      // The assertion is about clearing the synchronous allowlist gate, not DNS latency. Bound the
+      // intentionally-unresolvable socket attempt so Windows DNS cannot consume Jest's 5s timeout.
+      await net.fetch(url, { timeoutMs: 100 });
       return '(no error)';
     } catch (error) {
       return error instanceof Error ? error.message : String(error);

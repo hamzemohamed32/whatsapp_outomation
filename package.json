@@ -6,7 +6,7 @@
   "private": true,
   "license": "MIT",
   "engines": {
-    "node": ">=22.13"
+    "node": ">=24.0"
   },
   "scarfSettings": {
     "enabled": false
@@ -119,7 +119,7 @@
     "@types/express": "^5.0.0",
     "@types/jest": "^30.0.0",
     "@types/multer": "^2.2.0",
-    "@types/node": "^22",
+    "@types/node": "^24",
     "@types/pg": "^8.21.0",
     "@types/qrcode": "^1.5.5",
     "@types/supertest": "^7.2.1",

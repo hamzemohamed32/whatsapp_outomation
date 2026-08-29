@@ -180,7 +180,7 @@ Node.js framework for building server-side applications. The OpenWA backend is b
 
 ### Node.js
 
-JavaScript runtime used to run OpenWA. Recommended version: Node.js 22 LTS.
+JavaScript runtime used to run OpenWA. Recommended version: Node.js 24 LTS.
 
 ## O
 

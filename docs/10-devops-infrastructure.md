@@ -43,7 +43,7 @@ flowchart TB
 # Dockerfile (multi-stage build)
 
 # Build stage
-FROM node:22-slim AS builder
+FROM node:24-slim AS builder
 WORKDIR /app
 COPY package*.json ./
 RUN npm ci
@@ -51,7 +51,7 @@ COPY . .
 RUN npm run build
 
 # Runtime stage
-FROM node:22-slim
+FROM node:24-slim
 
 # Install Chrome dependencies (avoid Debian's chromium package due to SIGTRAP in non-root)
 RUN apt-get update && apt-get install -y \

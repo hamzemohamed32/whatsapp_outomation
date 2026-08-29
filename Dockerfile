@@ -9,10 +9,10 @@
 # minifier) optional dependency fails to install ("Cannot find module lightningcss.linux-arm64-gnu.node").
 # The per-arch runtime deps are installed natively in the target-platform production stage below.
 # NOTE: $BUILDPLATFORM requires BuildKit (CI uses buildx; modern `docker build`/compose default to it).
-# The digest pins the multi-arch node:22-slim index, so every build starts from the same immutable
+# The digest pins the multi-arch node:24-slim index, so every build starts from the same immutable
 # base; dependabot's docker ecosystem proposes the new digest when the tag moves. Update tag and
 # digest together.
-FROM --platform=$BUILDPLATFORM docker.io/node:22-slim@sha256:d649c27dae7ba0137b3cef5dd75baa422c08dc3d9e3fc0c23dfb172dc3cc6436 AS builder
+FROM --platform=$BUILDPLATFORM docker.io/node:24-slim@sha256:3638d9a6fe4030bd716be989438248074489337ba3275657f93595428be4fc03 AS builder
 
 WORKDIR /app
 
@@ -55,8 +55,8 @@ COPY . .
 RUN npm run build && npm run dashboard:ci -- --include=dev && npm run dashboard:build && rm -f dist/*.tsbuildinfo
 
 # ===== Stage 2: Production =====
-# Same digest-pinned node:22-slim base as the builder stage.
-FROM docker.io/node:22-slim@sha256:d649c27dae7ba0137b3cef5dd75baa422c08dc3d9e3fc0c23dfb172dc3cc6436 AS production
+# Same digest-pinned node:24-slim base as the builder stage.
+FROM docker.io/node:24-slim@sha256:3638d9a6fe4030bd716be989438248074489337ba3275657f93595428be4fc03 AS production
 
 # Run the app with production defaults from the first boot: an unset NODE_ENV selects the
 # development branch of the CORS/Swagger/DTO-error-detail/default-secret hardening (main.ts
@@ -204,8 +204,8 @@ RUN npm ci --omit=dev --ignore-scripts \
 # Replace the npm the base image bundles. npm is not on the request path — the entrypoint runs
 # `node dist/main` — but it stays in the image because the operator runbooks drive it
 # (`docker exec openwa npm run cli …`, `npm run export`), and its own bundled dependency tree is
-# what the release image scan reports. node:22-slim currently ships npm 10.9.8, whose bundle
-# carries a critical node-tar advisory plus sigstore/picomatch ones; npm 12 fixes all three.
+# what the release image scan reports. Replace the Node 24 base image's bundled npm with the exact
+# version audited by this release rather than letting that toolchain drift with the base tag.
 # Deliberately AFTER `npm ci`, so the application tree is still resolved by the npm the lockfile
 # was generated with and only the global CLI is swapped. Pinned to the exact patch release —
 # a floating npm@12 would make the image's bundled npm tree depend on when the build happened.

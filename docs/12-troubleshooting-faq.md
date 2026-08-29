@@ -88,12 +88,12 @@ and no unqualified-search registries are defined
 **Fix:** All `FROM` directives in the `Dockerfile` must use fully-qualified names:
 
 ```dockerfile
-FROM docker.io/node:22-slim
+FROM docker.io/node:24-slim
 ```
 
 ---
 
-### Issue: Healthcheck always `unhealthy` on Node 22 + Podman
+### Issue: Healthcheck always `unhealthy` on modern Node + Podman
 
 **Symptoms:** Container starts successfully but stays `unhealthy`; logs show:
 
@@ -102,7 +102,7 @@ SyntaxError: Unexpected end of input
 at evalTypeScript (node:internal/process/execution:256:22)
 ```
 
-**Cause:** Node 22 routes `node -e` through its TypeScript evaluator which rejects arrow-function
+**Cause:** Modern Node routes `node -e` through its TypeScript evaluator which rejects arrow-function
 syntax. Podman also splits quoted shell commands on whitespace, truncating the `-e` argument.
 
 **Fix:** Use `curl` for the healthcheck instead of `node -e`:

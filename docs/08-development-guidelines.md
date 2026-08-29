@@ -601,7 +601,7 @@ Add a new one only when the condition is engine-agnostic and recurs; a one-off s
 
 ```bash
 # Required
-- Node.js 22 LTS
+- Node.js 24 LTS
 - npm 10+
 - Docker & Docker Compose
 - Git

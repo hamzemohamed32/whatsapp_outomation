@@ -21,6 +21,7 @@ import {
 import { getEffectiveWebVersionInfo, resolveWebVersionPin, __resetWebVersionCache } from '../wa-web-version';
 import * as fs from 'fs';
 import * as path from 'path';
+import { tmpdir } from 'os';
 import * as qrcode from 'qrcode';
 import { InternalServerErrorException, UnprocessableEntityException, BadRequestException } from '@nestjs/common';
 import { EngineNotReadyError } from '../../common/errors/engine-not-ready.error';
@@ -38,6 +39,16 @@ import { GroupNotFoundError } from '../../common/errors/group-not-found.error';
 import { LabelNotFoundError } from '../../common/errors/label-not-found.error';
 import { SsrfBlockedError } from '../../common/security/ssrf-guard';
 import { fetch as undiciFetch } from 'undici';
+
+// Most adapter tests exercise protocol behavior and must not spawn the host's real process lister.
+// The dedicated hygiene block below temporarily enables it and mocks execFile/process.kill.
+process.env.OPENWA_DISABLE_ORPHAN_SWEEP = 'true';
+
+// LocalAuth creates profile directories as soon as some initialization paths are exercised. Keep
+// every such artifact out of the operator's real ./data/sessions directory and remove it after the
+// suite. This prevents a unit test from looking like a real saved WhatsApp session.
+const TEST_SESSION_DATA_PATH = fs.mkdtempSync(path.join(tmpdir(), 'openwa-wwebjs-spec-'));
+afterAll(() => fs.rmSync(TEST_SESSION_DATA_PATH, { recursive: true, force: true }));
 
 // Allowlisted hosts are PINNED to their DNS answer (ssrf-guard pins allowlisted hosts to their DNS answers), so the specs that exercise
 // the SSRF_ALLOWED_HOSTS escape-hatch need a deterministic resolver. Default answers are PUBLIC
@@ -150,7 +161,7 @@ describe('isExecutionContextDestroyedError (#708 — Puppeteer context loss duri
 // next step. The hint has to travel WITH the reason, not beside it.
 describe('WhatsAppWebJsAdapter initialize() failure reason (#1081)', () => {
   const newAdapter = (): WhatsAppWebJsAdapter =>
-    new WhatsAppWebJsAdapter({ sessionId: 'sess-advisory', sessionDataPath: './data/sessions', puppeteer: {} });
+    new WhatsAppWebJsAdapter({ sessionId: 'sess-advisory', sessionDataPath: TEST_SESSION_DATA_PATH, puppeteer: {} });
 
   let rmSpy: jest.SpyInstance;
   let clientInitSpy: jest.SpyInstance;
@@ -210,7 +221,7 @@ describe('WhatsAppWebJsAdapter initialize() failure reason (#1081)', () => {
 // one-navigation death into a normal slow start (#1081).
 describe('WhatsAppWebJsAdapter initialize() retry on a navigation-killed first inject (#1081)', () => {
   const newAdapter = (): WhatsAppWebJsAdapter =>
-    new WhatsAppWebJsAdapter({ sessionId: 'sess-nav-retry', sessionDataPath: './data/sessions', puppeteer: {} });
+    new WhatsAppWebJsAdapter({ sessionId: 'sess-nav-retry', sessionDataPath: TEST_SESSION_DATA_PATH, puppeteer: {} });
 
   const EXEC_CTX = 'Protocol error (Runtime.callFunctionOn): Execution context was destroyed.';
 
@@ -5211,7 +5222,7 @@ describe('WhatsAppWebJsAdapter navigation re-inject grace (#1081)', () => {
 describe('WhatsAppWebJsAdapter stale Singleton cleanup (pre-launch)', () => {
   const SESSION_ID = 'sess-singleton';
   const newAdapter = (): WhatsAppWebJsAdapter =>
-    new WhatsAppWebJsAdapter({ sessionId: SESSION_ID, sessionDataPath: './data/sessions', puppeteer: {} });
+    new WhatsAppWebJsAdapter({ sessionId: SESSION_ID, sessionDataPath: TEST_SESSION_DATA_PATH, puppeteer: {} });
 
   let rmSpy: jest.SpyInstance;
   let clientInitSpy: jest.SpyInstance;
@@ -5253,7 +5264,7 @@ describe('WhatsAppWebJsAdapter stale Singleton cleanup (pre-launch)', () => {
     await newAdapter().initialize({});
 
     // Same dir LocalAuth uses as userDataDir: <resolved dataPath>/session-<clientId>.
-    const profileDir = path.join(path.resolve('./data/sessions'), `session-${SESSION_ID}`);
+    const profileDir = path.join(path.resolve(TEST_SESSION_DATA_PATH), `session-${SESSION_ID}`);
     expect(rmSpy).toHaveBeenCalledTimes(3);
     expect(rmSpy).toHaveBeenCalledWith(path.join(profileDir, 'SingletonLock'), { force: true });
     expect(rmSpy).toHaveBeenCalledWith(path.join(profileDir, 'SingletonSocket'), { force: true });
@@ -5275,7 +5286,7 @@ describe('WhatsAppWebJsAdapter stale Singleton cleanup (pre-launch)', () => {
 describe('WhatsAppWebJsAdapter orphaned Chromium sweep (pre-launch)', () => {
   const SESSION_ID = 'sess-orphan';
   const newAdapter = (): WhatsAppWebJsAdapter =>
-    new WhatsAppWebJsAdapter({ sessionId: SESSION_ID, sessionDataPath: './data/sessions', puppeteer: {} });
+    new WhatsAppWebJsAdapter({ sessionId: SESSION_ID, sessionDataPath: TEST_SESSION_DATA_PATH, puppeteer: {} });
 
   type ExecFileCallback = (error: Error | null, stdout: string, stderr: string) => void;
 
@@ -5284,6 +5295,8 @@ describe('WhatsAppWebJsAdapter orphaned Chromium sweep (pre-launch)', () => {
   let rmSpy: jest.SpyInstance;
   let clientInitSpy: jest.SpyInstance;
   let savedWebVersion: string | undefined;
+  let savedDisableSweep: string | undefined;
+  let platformDescriptor: PropertyDescriptor;
 
   // execFile is overloaded, so spy through a structural shape like the Client.prototype spies above.
   // The adapter invokes it as execFile('ps', args, opts, callback); the callback is always last.
@@ -5301,6 +5314,12 @@ describe('WhatsAppWebJsAdapter orphaned Chromium sweep (pre-launch)', () => {
   };
 
   beforeEach(() => {
+    // Exercise the POSIX parser deterministically on every CI host. Windows has a dedicated
+    // PowerShell/CIM case below.
+    platformDescriptor = Object.getOwnPropertyDescriptor(process, 'platform') as PropertyDescriptor;
+    Object.defineProperty(process, 'platform', { value: 'linux' });
+    savedDisableSweep = process.env.OPENWA_DISABLE_ORPHAN_SWEEP;
+    delete process.env.OPENWA_DISABLE_ORPHAN_SWEEP;
     // Keep initialize() offline: 'off' skips the wa-version registry fetch in resolveWebVersionPin.
     savedWebVersion = process.env.WWEBJS_WEB_VERSION;
     process.env.WWEBJS_WEB_VERSION = 'off';
@@ -5324,6 +5343,9 @@ describe('WhatsAppWebJsAdapter orphaned Chromium sweep (pre-launch)', () => {
     killSpy.mockRestore();
     rmSpy.mockRestore();
     clientInitSpy.mockRestore();
+    Object.defineProperty(process, 'platform', platformDescriptor);
+    if (savedDisableSweep === undefined) delete process.env.OPENWA_DISABLE_ORPHAN_SWEEP;
+    else process.env.OPENWA_DISABLE_ORPHAN_SWEEP = savedDisableSweep;
     if (savedWebVersion === undefined) {
       delete process.env.WWEBJS_WEB_VERSION;
     } else {
@@ -5446,9 +5468,36 @@ describe('WhatsAppWebJsAdapter orphaned Chromium sweep (pre-launch)', () => {
     expect(killSpy).toHaveBeenCalledWith(1803, 'SIGKILL');
   });
 
-  it('skips the sweep on platforms other than darwin/linux (no ps, no kill)', async () => {
+  it('enumerates and kills a marked Chromium process on Windows through PowerShell/CIM', async () => {
     const platform = Object.getOwnPropertyDescriptor(process, 'platform') as PropertyDescriptor;
     Object.defineProperty(process, 'platform', { value: 'win32' });
+    try {
+      mockPsResult({
+        stdout: JSON.stringify([
+          {
+            ProcessId: 1804,
+            CommandLine: `chrome.exe --headless --openwa-session=${SESSION_ID}`,
+          },
+          { ProcessId: 1805, CommandLine: 'node.exe dist/main.js' },
+        ]),
+      });
+      await newAdapter().initialize({});
+    } finally {
+      Object.defineProperty(process, 'platform', platform);
+    }
+
+    expect(execFileSpy).toHaveBeenCalledWith(
+      'powershell.exe',
+      expect.arrayContaining(['-NoProfile', '-NonInteractive', '-Command']),
+      expect.any(Object),
+      expect.any(Function),
+    );
+    expect(killSpy).toHaveBeenCalledWith(1804, 'SIGKILL');
+  });
+
+  it('skips the sweep on unsupported platforms (no process enumeration, no kill)', async () => {
+    const platform = Object.getOwnPropertyDescriptor(process, 'platform') as PropertyDescriptor;
+    Object.defineProperty(process, 'platform', { value: 'aix' });
     try {
       await newAdapter().initialize({});
     } finally {
